@@ -11,7 +11,7 @@ type Tuple3[T any] struct {
 	C T
 }
 
-type Tuple5[T any] struct {
+type Tuple4[T any] struct {
 	A T
 	B T
 	C T
