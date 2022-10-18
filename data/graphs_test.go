@@ -42,26 +42,3 @@ func TestUndirectedGraph_Merge(t *testing.T) {
 	assert.ElementsMatch(t, []int{0, 3, 4}, graph.Get(1).Adjacent)
 	assert.ElementsMatch(t, []int{1, 4}, graph.Get(3).Adjacent)
 }
-
-func TestUndirectedGraph_Consolidate(t *testing.T) {
-	graph := NewUndirectedGraph[uint64]()
-	graph.Insert(0)
-	graph.Insert(1)
-	graph.Insert(2)
-	graph.Insert(3)
-
-	graph.Connect(0, 1)
-	graph.Connect(1, 2)
-	graph.Connect(1, 3)
-
-	/*
-		         3
-		        ||
-			0 = 1 = 2
-	*/
-
-	graph.Remove(2)
-	changes := graph.Consolidate()
-
-	t.Log(changes)
-}
