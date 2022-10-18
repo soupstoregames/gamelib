@@ -1,7 +1,6 @@
 package data
 
 import (
-	"github.com/soupstoregames/gamelib/maths"
 	"github.com/soupstoregames/gamelib/utils"
 )
 
@@ -49,7 +48,6 @@ func (u *UndirectedGraph[T]) Get(id int) GraphNode[T] {
 
 func (u *UndirectedGraph[T]) Clear() {
 	u.data.Clear()
-	u.data.Truncate(0)
 }
 
 func (u *UndirectedGraph[T]) Connect(a, b int) {
@@ -91,26 +89,6 @@ func (u *UndirectedGraph[T]) Merge(a, b int) {
 	}
 
 	u.data.Erase(b)
-}
-
-func (u *UndirectedGraph[T]) Consolidate() []maths.Tuple2[int] {
-	changes, newLength := u.data.Consolidate()
-
-	// update the graph connections to point to the new positions
-	for i := newLength - 1; i >= 0; i-- {
-		node := u.data.Get(i)
-		for _, c := range changes {
-			idx, ok := utils.Find(node.Adjacent, c.A)
-			if ok {
-				node.Adjacent[idx] = c.B
-			}
-		}
-		u.data.Set(i, node)
-	}
-
-	u.data.Truncate(newLength)
-
-	return changes
 }
 
 func (u *UndirectedGraph[T]) Len() int {

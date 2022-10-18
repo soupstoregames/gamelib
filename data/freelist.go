@@ -1,7 +1,5 @@
 package data
 
-import "github.com/soupstoregames/gamelib/maths"
-
 type freeListEntry[T any] struct {
 	element  T
 	nextFree int
@@ -63,46 +61,4 @@ func (f *FreeList[T]) Get(n int) T {
 
 func (f *FreeList[T]) Len() int {
 	return len(f.data)
-}
-
-// Consolidate will fill in the empty slots in the backing slice with the elements on the end of the list
-// and return a slice of tuples representing the old index and the new index of all moved items
-// It also sets the backing slice's len and cap to current size.
-func (f *FreeList[T]) Consolidate() ([]maths.Tuple2[int], int) {
-	var moves []maths.Tuple2[int]
-	newLength := f.Len()
-	for i := f.Len() - 1; i >= 0; i-- {
-		for {
-			if f.FirstFree > i {
-				f.FirstFree = f.data[f.FirstFree].nextFree
-				newLength--
-			} else {
-				break
-			}
-		}
-
-		// if no free slots then stop
-		if f.FirstFree == -1 {
-			break
-		}
-
-		// if there is an element stored here
-		if f.data[i].nextFree == 0 {
-			element := f.data[i].element
-			j := f.Insert(element)
-			newLength--
-			moves = append(moves, maths.Tuple2[int]{A: i, B: j})
-		} else {
-			moves = append(moves, maths.Tuple2[int]{A: i, B: -1})
-		}
-	}
-	return moves, newLength
-}
-
-// Truncate reduces the size of the backing array to the specified length.
-// This is not recommended unless combined with the result of Consolidate.
-// This data structure is designed to keep allocated memory for further use,
-// so be sure this is what you want to do.
-func (f *FreeList[T]) Truncate(newLength int) {
-	f.data = f.data[:newLength:newLength]
 }
