@@ -7,27 +7,27 @@ import (
 	"testing"
 )
 
-func BenchmarkNewSphereTree_Move(b *testing.B) {
+func BenchmarkNewSphereTree_MoveAndProcess(b *testing.B) {
 	cases := map[string]struct {
 		actors        int
 		maxSphereSize float64
 	}{
-		//"?actors=2000&maxSphereSize=100": {
-		//	actors:        2000,
-		//	maxSphereSize: 100,
-		//},
-		//"?actors=2000&maxSphereSize=250": {
-		//	actors:        2000,
-		//	maxSphereSize: 250,
-		//},
-		//"?actors=2000&maxSphereSize=500": {
-		//	actors:        2000,
-		//	maxSphereSize: 500,
-		//},
-		//"?actors=2000&maxSphereSize=750": {
-		//	actors:        2000,
-		//	maxSphereSize: 750,
-		//},
+		"?actors=2000&maxSphereSize=100": {
+			actors:        2000,
+			maxSphereSize: 100,
+		},
+		"?actors=2000&maxSphereSize=250": {
+			actors:        2000,
+			maxSphereSize: 250,
+		},
+		"?actors=2000&maxSphereSize=500": {
+			actors:        2000,
+			maxSphereSize: 500,
+		},
+		"?actors=2000&maxSphereSize=750": {
+			actors:        2000,
+			maxSphereSize: 750,
+		},
 		"?actors=2000&maxSphereSize=1000": {
 			actors:        2000,
 			maxSphereSize: 1000,
@@ -102,11 +102,13 @@ func BenchmarkNewSphereTree_Scan(b *testing.B) {
 		b.Run(name, func(b *testing.B) {
 			st := space.NewSphereTree(maths.Sphere{Center: center, Radius: 6000}, 1000, 100)
 
+			var actors []actor
 			for i := 0; i < c.actors; i++ {
 				actor := actor{
 					sphere: maths.Sphere{Center: maths.Vector3{X: rand.Float64() * 8000, Y: rand.Float64() * 8000}, Radius: 1},
 				}
 				actor.entryID = st.Insert(uint64(i), actor.sphere)
+				actors = append(actors, actor)
 			}
 
 			// static actors
@@ -118,9 +120,7 @@ func BenchmarkNewSphereTree_Scan(b *testing.B) {
 			b.ResetTimer()
 
 			for n := 0; n < b.N; n++ {
-				for i := 0; i < c.actors; i++ {
-					st.Scan(maths.Sphere{Center: center, Radius: 100})
-				}
+				st.Scan(maths.Sphere{Center: center, Radius: 100})
 			}
 		})
 	}

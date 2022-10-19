@@ -202,54 +202,6 @@ func (st *SphereTree) recompute(superSphereID int) {
 	}
 	superSphere.Sphere.Radius = newRadius + st.gravy
 	st.spheres.Set(superSphereID, superSphere)
-
-	// RINSE: look for circle that can own this one
-	//superParent := st.spheres.Get(superSphere.parent)
-	//possibleParentID := superParent.firstChild
-	//for {
-	//	if possibleParentID == 0 {
-	//		panic("no")
-	//	}
-	//	if possibleParentID == -1 {
-	//		break
-	//	}
-	//
-	//	if possibleParentID == superSphereID {
-	//		possibleParentID = superSphere.next
-	//		continue
-	//	}
-	//
-	//	possibleParent := st.spheres.Get(possibleParentID)
-	//	if possibleParent.Sphere.ContainsSphere(superSphere.Sphere) {
-	//		// find last child of possible parent
-	//
-	//		childIndex := superSphere.firstChild
-	//		for {
-	//			if childIndex == -1 {
-	//				break
-	//			}
-	//
-	//			child := st.spheres.Get(childIndex)
-	//			next := child.next
-	//			child.next = possibleParent.firstChild
-	//			child.parent = possibleParentID
-	//			possibleParent.firstChild = childIndex
-	//			st.spheres.Set(childIndex, child)
-	//
-	//			childIndex = next
-	//		}
-	//
-	//		superSphere.firstChild = -1
-	//		st.spheres.Set(superSphereID, superSphere)
-	//		st.spheres.Set(possibleParentID, possibleParent)
-	//		st.QueueRecompute(superSphereID)
-	//		st.QueueRecompute(possibleParentID)
-	//
-	//		break
-	//	}
-	//
-	//	possibleParentID = possibleParent.next
-	//}
 }
 
 func (st *SphereTree) Walk(f func(s maths.Sphere, isSuper bool)) {
