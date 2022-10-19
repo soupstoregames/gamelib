@@ -12,22 +12,22 @@ func BenchmarkNewSphereTree_Move(b *testing.B) {
 		actors        int
 		maxSphereSize float64
 	}{
-		"?actors=2000&maxSphereSize=100": {
-			actors:        2000,
-			maxSphereSize: 100,
-		},
-		"?actors=2000&maxSphereSize=250": {
-			actors:        2000,
-			maxSphereSize: 250,
-		},
-		"?actors=2000&maxSphereSize=500": {
-			actors:        2000,
-			maxSphereSize: 500,
-		},
-		"?actors=2000&maxSphereSize=750": {
-			actors:        2000,
-			maxSphereSize: 750,
-		},
+		//"?actors=2000&maxSphereSize=100": {
+		//	actors:        2000,
+		//	maxSphereSize: 100,
+		//},
+		//"?actors=2000&maxSphereSize=250": {
+		//	actors:        2000,
+		//	maxSphereSize: 250,
+		//},
+		//"?actors=2000&maxSphereSize=500": {
+		//	actors:        2000,
+		//	maxSphereSize: 500,
+		//},
+		//"?actors=2000&maxSphereSize=750": {
+		//	actors:        2000,
+		//	maxSphereSize: 750,
+		//},
 		"?actors=2000&maxSphereSize=1000": {
 			actors:        2000,
 			maxSphereSize: 1000,
@@ -63,7 +63,7 @@ func BenchmarkNewSphereTree_Move(b *testing.B) {
 
 			for n := 0; n < b.N; n++ {
 				for i := 0; i < c.actors; i++ {
-					delta := center.Sub(actors[i].sphere.Center).Normalize()
+					delta := center.Sub(actors[i].sphere.Center).Normalize().Multiply(0.03)
 					actors[i].sphere.Center = actors[i].sphere.Center.Add(delta)
 					st.Move(actors[i].entryID, actors[i].sphere)
 				}

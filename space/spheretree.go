@@ -17,7 +17,7 @@ type SphereTree struct {
 
 type SphereEntry struct {
 	ID         uint64
-	sphere     maths.Sphere
+	Sphere     maths.Sphere
 	parent     int
 	firstChild int
 	next       int
@@ -30,13 +30,13 @@ func NewSphereTree(rootSphere maths.Sphere, maxSize, gravy float64) *SphereTree 
 		gravy:   gravy,
 	}
 
-	st.spheres.Insert(SphereEntry{sphere: rootSphere, firstChild: -1, next: -1})
+	st.spheres.Insert(SphereEntry{Sphere: rootSphere, firstChild: -1, next: -1})
 
 	return st
 }
 
 func (st *SphereTree) Insert(id uint64, sphere maths.Sphere) int {
-	entry := SphereEntry{ID: id, sphere: sphere, firstChild: -2, next: -1}
+	entry := SphereEntry{ID: id, Sphere: sphere, firstChild: -2, next: -1}
 	// insert entry into list
 	i := st.spheres.Insert(entry)
 	// set the entry to be integrated into the tree, don't do it now
@@ -54,18 +54,18 @@ func (st *SphereTree) Remove(entryID int) {
 
 func (st *SphereTree) Move(entryID int, sphere maths.Sphere) {
 	entry := st.spheres.Get(entryID)
-	entry.sphere = sphere
+	entry.Sphere = sphere
 	st.spheres.Set(entryID, entry)
 
 	parentID := entry.parent
 	parent := st.spheres.Get(parentID)
 	// parent spheres still contains
-	if parent.sphere.ContainsSphere(entry.sphere) {
+	if parent.Sphere.ContainsSphere(entry.Sphere) {
 		//st.QueueRecompute(parentID) // TODO: maybe dont
 		return
 	}
 
-	// entry has broken out of sphere
+	// entry has broken out of Sphere
 	// so detach it and queue it for integration
 	// and recompute its old parent
 	st.removeChild(parentID, entryID)
@@ -98,13 +98,13 @@ func (st *SphereTree) integrate(entryID int) {
 			break
 		}
 		superSphere := st.spheres.Get(superSphereIndex)
-		if superSphere.sphere.ContainsSphere(integrateCandidate.sphere) {
+		if superSphere.Sphere.ContainsSphere(integrateCandidate.Sphere) {
 			containsUs = superSphereIndex
 			break
 		}
 
 		// TODO: Verify this
-		dist := superSphere.sphere.Center.Distance(integrateCandidate.sphere.Center) + integrateCandidate.sphere.Radius - superSphere.sphere.Radius
+		dist := superSphere.Sphere.Center.Distance(integrateCandidate.Sphere.Center) + integrateCandidate.Sphere.Radius - superSphere.Sphere.Radius
 		if dist < nearestDist {
 			nearest = superSphereIndex
 			nearestDist = dist
@@ -113,31 +113,31 @@ func (st *SphereTree) integrate(entryID int) {
 		superSphereIndex = superSphere.next
 	}
 
-	// if a super sphere contains it, just insert it!
+	// if a super Sphere contains it, just insert it!
 	if containsUs != -1 {
 		st.addChild(containsUs, entryID)
 		return
 	}
 
-	// check to see if the nearest sphere can grow to contain us
+	// check to see if the nearest Sphere can grow to contain us
 	if nearest != -1 {
 		parent := st.spheres.Get(nearest)
-		newSize := nearestDist + parent.sphere.Radius
+		newSize := nearestDist + parent.Sphere.Radius
 		if newSize <= st.maxSize {
-			parent.sphere.Radius = newSize + st.gravy
+			parent.Sphere.Radius = newSize + st.gravy
 			st.spheres.Set(nearest, parent)
 			st.addChild(nearest, entryID)
 			return
 		}
 	}
 
-	// we'll have to make a new super sphere
+	// we'll have to make a new super Sphere
 	parent := SphereEntry{
-		sphere:     integrateCandidate.sphere,
+		Sphere:     integrateCandidate.Sphere,
 		firstChild: -1,
 		parent:     0,
 	}
-	parent.sphere.Radius += st.gravy
+	parent.Sphere.Radius += st.gravy
 	rootSphere = st.spheres.Get(0) // root
 	parent.next = rootSphere.firstChild
 	parentID := st.spheres.Insert(parent)
@@ -176,12 +176,12 @@ func (st *SphereTree) recompute(superSphereID int) {
 
 		childCount++
 		child := st.spheres.Get(childIndex)
-		total = total.Add(child.sphere.Center)
+		total = total.Add(child.Sphere.Center)
 		childIndex = child.next
 	}
 	recip := 1.0 / float64(childCount)
-	oldCenter := superSphere.sphere.Center
-	superSphere.sphere.Center = total.Multiply(recip)
+	oldCenter := superSphere.Sphere.Center
+	superSphere.Sphere.Center = total.Multiply(recip)
 
 	newRadius := 0.0
 	childIndex = superSphere.firstChild
@@ -190,66 +190,66 @@ func (st *SphereTree) recompute(superSphereID int) {
 			break
 		}
 		child := st.spheres.Get(childIndex)
-		radius := superSphere.sphere.Center.Distance(child.sphere.Center) + child.sphere.Radius
+		radius := superSphere.Sphere.Center.Distance(child.Sphere.Center) + child.Sphere.Radius
 		if radius > newRadius {
 			newRadius = radius
-			if newRadius+st.gravy > superSphere.sphere.Radius {
-				superSphere.sphere.Center = oldCenter
+			if newRadius+st.gravy > superSphere.Sphere.Radius {
+				superSphere.Sphere.Center = oldCenter
 				return
 			}
 		}
 		childIndex = child.next
 	}
-	superSphere.sphere.Radius = newRadius + st.gravy
+	superSphere.Sphere.Radius = newRadius + st.gravy
 	st.spheres.Set(superSphereID, superSphere)
 
 	// RINSE: look for circle that can own this one
-	root := st.spheres.Get(0)
-	possibleParentID := root.firstChild
-	for {
-		if possibleParentID == 0 {
-			panic("no")
-		}
-		if possibleParentID == -1 {
-			break
-		}
-
-		if possibleParentID == superSphereID {
-			possibleParentID = superSphere.next
-			continue
-		}
-
-		possibleParent := st.spheres.Get(possibleParentID)
-		if possibleParent.sphere.ContainsSphere(superSphere.sphere) {
-			// find last child of possible parent
-
-			childIndex := superSphere.firstChild
-			for {
-				if childIndex == -1 {
-					break
-				}
-
-				child := st.spheres.Get(childIndex)
-				next := child.next
-				child.next = possibleParent.firstChild
-				child.parent = possibleParentID
-				possibleParent.firstChild = childIndex
-				st.spheres.Set(childIndex, child)
-
-				childIndex = next
-			}
-
-			superSphere.firstChild = -1
-			st.spheres.Set(superSphereID, superSphere)
-			st.spheres.Set(possibleParentID, possibleParent)
-			st.QueueRecompute(superSphereID)
-			st.QueueRecompute(possibleParentID)
-
-			break
-		}
-
-		possibleParentID = possibleParent.next
-	}
+	//superParent := st.spheres.Get(superSphere.parent)
+	//possibleParentID := superParent.firstChild
+	//for {
+	//	if possibleParentID == 0 {
+	//		panic("no")
+	//	}
+	//	if possibleParentID == -1 {
+	//		break
+	//	}
+	//
+	//	if possibleParentID == superSphereID {
+	//		possibleParentID = superSphere.next
+	//		continue
+	//	}
+	//
+	//	possibleParent := st.spheres.Get(possibleParentID)
+	//	if possibleParent.Sphere.ContainsSphere(superSphere.Sphere) {
+	//		// find last child of possible parent
+	//
+	//		childIndex := superSphere.firstChild
+	//		for {
+	//			if childIndex == -1 {
+	//				break
+	//			}
+	//
+	//			child := st.spheres.Get(childIndex)
+	//			next := child.next
+	//			child.next = possibleParent.firstChild
+	//			child.parent = possibleParentID
+	//			possibleParent.firstChild = childIndex
+	//			st.spheres.Set(childIndex, child)
+	//
+	//			childIndex = next
+	//		}
+	//
+	//		superSphere.firstChild = -1
+	//		st.spheres.Set(superSphereID, superSphere)
+	//		st.spheres.Set(possibleParentID, possibleParent)
+	//		st.QueueRecompute(superSphereID)
+	//		st.QueueRecompute(possibleParentID)
+	//
+	//		break
+	//	}
+	//
+	//	possibleParentID = possibleParent.next
+	//}
 }
 
 func (st *SphereTree) Walk(f func(s maths.Sphere, isSuper bool)) {
@@ -267,7 +267,7 @@ func (st *SphereTree) Walk(f func(s maths.Sphere, isSuper bool)) {
 				break
 			}
 			entry := st.spheres.Get(entryIndex)
-			f(entry.sphere, false)
+			f(entry.Sphere, false)
 			entryIndex = entry.next
 		}
 		childIndex = child.next
@@ -279,7 +279,7 @@ func (st *SphereTree) Walk(f func(s maths.Sphere, isSuper bool)) {
 			break
 		}
 		child := st.spheres.Get(childIndex)
-		f(child.sphere, true)
+		f(child.Sphere, true)
 		childIndex = child.next
 	}
 }
@@ -316,7 +316,7 @@ func (st *SphereTree) Scan(selectionSphere maths.Sphere) []SphereEntry {
 			break
 		}
 		sphere := st.spheres.Get(sphereIndex)
-		if selectionSphere.IntersectsSphere(sphere.sphere) {
+		if selectionSphere.IntersectsSphere(sphere.Sphere) {
 			childIndex := sphere.firstChild
 			for {
 				if childIndex == -1 {
@@ -325,7 +325,7 @@ func (st *SphereTree) Scan(selectionSphere maths.Sphere) []SphereEntry {
 
 				child := st.spheres.Get(childIndex)
 
-				if selectionSphere.IntersectsSphere(child.sphere) {
+				if selectionSphere.IntersectsSphere(child.Sphere) {
 					results = append(results, child)
 				}
 
