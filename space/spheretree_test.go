@@ -12,15 +12,15 @@ func BenchmarkNewSphereTree_MoveAndProcess(b *testing.B) {
 		actors        int
 		maxSphereSize float64
 	}{
-		//"?actors=10": {
-		//	actors: 10,
-		//},
-		//"?actors=100": {
-		//	actors: 100,
-		//},
-		//"?actors=1000": {
-		//	actors: 1000,
-		//},
+		"?actors=10": {
+			actors: 10,
+		},
+		"?actors=100": {
+			actors: 100,
+		},
+		"?actors=1000": {
+			actors: 1000,
+		},
 		"?actors=10000": {
 			actors: 10000,
 		},
