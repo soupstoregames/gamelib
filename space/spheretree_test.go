@@ -12,17 +12,20 @@ func BenchmarkNewSphereTree_MoveAndProcess(b *testing.B) {
 		actors        int
 		maxSphereSize float64
 	}{
-		"?actors=10": {
-			actors: 10,
-		},
-		"?actors=100": {
-			actors: 100,
-		},
 		"?actors=1000": {
 			actors: 1000,
 		},
-		"?actors=10000": {
-			actors: 10000,
+		"?actors=2000": {
+			actors: 2000,
+		},
+		"?actors=3000": {
+			actors: 3000,
+		},
+		"?actors=4000": {
+			actors: 4000,
+		},
+		"?actors=5000": {
+			actors: 5000,
 		},
 	}
 
@@ -68,17 +71,20 @@ func BenchmarkNewSphereTree_Scan(b *testing.B) {
 	cases := map[string]struct {
 		actors int
 	}{
-		"?actors=10": {
-			actors: 10,
-		},
-		"?actors=100": {
-			actors: 100,
-		},
 		"?actors=1000": {
 			actors: 1000,
 		},
-		"?actors=10000": {
-			actors: 10000,
+		"?actors=2000": {
+			actors: 2000,
+		},
+		"?actors=3000": {
+			actors: 3000,
+		},
+		"?actors=4000": {
+			actors: 4000,
+		},
+		"?actors=5000": {
+			actors: 5000,
 		},
 	}
 
