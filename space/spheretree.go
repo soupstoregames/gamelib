@@ -149,8 +149,6 @@ func (st *SphereTree) Scan(entries *[]SphereEntry, selectionSphere maths.Sphere)
 						entry := st.spheres.Get(entryID)
 						if selectionSphere.IntersectsSphere(entry.Sphere) {
 							*entries = append(*entries, entry)
-							*entries = append(*entries, branch) // TODO: temp
-							*entries = append(*entries, leaf)   // TODO: temp
 						}
 						entryID = entry.next
 					}
