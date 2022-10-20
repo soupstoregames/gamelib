@@ -14,18 +14,18 @@ func NewBitfield1[T Unsigned](value T) Bitfield1[T] {
 	}
 }
 
-func (b Bitfield1[T]) Set(i int) Bitfield1[T] {
-	return Bitfield1[T]{b.Raw | 1<<i}
+func (b *Bitfield1[T]) Set(i int) {
+	b.Raw |= 1 << i
 }
 
-func (b Bitfield1[T]) Clear(i int) Bitfield1[T] {
-	return Bitfield1[T]{b.Raw &^ 1 << i}
+func (b *Bitfield1[T]) Clear(i int) {
+	b.Raw &^= 1 << i
 }
 
-func (b Bitfield1[T]) Toggle(i int) Bitfield1[T] {
-	return Bitfield1[T]{b.Raw ^ 1<<i}
+func (b *Bitfield1[T]) Toggle(i int) {
+	b.Raw ^= 1 << i
 }
 
-func (b Bitfield1[T]) Has(i int) bool {
+func (b *Bitfield1[T]) Has(i int) bool {
 	return b.Raw&(1<<i) != 0
 }
