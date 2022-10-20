@@ -11,45 +11,54 @@ type SphereTree struct {
 	spheres       data.FreeList[SphereEntry]
 	integrateFIFO data.Queue[int]
 	recomputeFIFO data.Queue[int]
-	maxSize       float64
+
+	maxBranchSize float64
+	maxLeafSize   float64
 	gravy         float64
 }
 
+const (
+	SPFRootNode = iota
+	SPFIntegrate
+	SPFRecompute
+)
+
 type SphereEntry struct {
-	ID         uint64
-	Sphere     maths.Sphere
+	ID     uint64
+	Sphere maths.Sphere
+
 	parent     int
 	firstChild int
 	next       int
+	flags      data.Bitfield1[uint8]
 }
 
-func NewSphereTree(rootSphere maths.Sphere, maxSize, gravy float64) *SphereTree {
+func NewSphereTree(center maths.Vector3, maxBranchSize, maxLeafSize, gravy float64) *SphereTree {
 	st := &SphereTree{
-		spheres: data.FreeList[SphereEntry]{FirstFree: -1},
-		maxSize: maxSize,
-		gravy:   gravy,
+		spheres:       data.FreeList[SphereEntry]{FirstFree: -1},
+		maxBranchSize: maxBranchSize,
+		maxLeafSize:   maxLeafSize,
+		gravy:         gravy,
 	}
 
-	st.spheres.Insert(SphereEntry{Sphere: rootSphere, firstChild: -1, next: -1})
+	branchRoot := SphereEntry{Sphere: maths.Sphere{Center: center, Radius: math.MaxFloat64}, firstChild: -1, next: -1}
+	branchRoot.flags.Set(SPFRootNode)
+	st.spheres.Insert(branchRoot)
 
 	return st
 }
 
 func (st *SphereTree) Insert(id uint64, sphere maths.Sphere) int {
-	entry := SphereEntry{ID: id, Sphere: sphere, firstChild: -2, next: -1}
-	// insert entry into list
+	entry := SphereEntry{ID: id, Sphere: sphere, firstChild: -1, next: -1}
 	i := st.spheres.Insert(entry)
-	// set the entry to be integrated into the tree, don't do it now
-	st.QueueIntegrate(i)
+	st.queueIntegrate(i)
 	return i
 }
 
 func (st *SphereTree) Remove(entryID int) {
 	entry := st.spheres.Get(entryID)
-	st.spheres.Erase(entryID)
-
-	// remove this entry from the parent's linked list
 	st.removeChild(entry.parent, entryID)
+	st.spheres.Erase(entryID)
 }
 
 func (st *SphereTree) Move(entryID int, sphere maths.Sphere) {
@@ -59,9 +68,7 @@ func (st *SphereTree) Move(entryID int, sphere maths.Sphere) {
 
 	parentID := entry.parent
 	parent := st.spheres.Get(parentID)
-	// parent spheres still contains
 	if parent.Sphere.ContainsSphere(entry.Sphere) {
-		//st.QueueRecompute(parentID) // TODO: maybe dont
 		return
 	}
 
@@ -69,7 +76,8 @@ func (st *SphereTree) Move(entryID int, sphere maths.Sphere) {
 	// so detach it and queue it for integration
 	// and recompute its old parent
 	st.removeChild(parentID, entryID)
-	st.QueueIntegrate(entryID)
+	st.queueIntegrate(entryID)
+	st.queueRecompute(parentID)
 }
 
 func (st *SphereTree) Integrate() {
@@ -82,71 +90,6 @@ func (st *SphereTree) Integrate() {
 	}
 }
 
-func (st *SphereTree) integrate(entryID int) {
-	integrateCandidate := st.spheres.Get(entryID)
-
-	containsUs := -1
-	nearest := -1
-	nearestDist := math.MaxFloat64
-
-	// look through all super spheres for candidate parent
-	// look for super spheres that fully contain the candidate or find the closet one
-	rootSphere := st.spheres.Get(0) // root
-	superSphereIndex := rootSphere.firstChild
-	for {
-		if superSphereIndex < 0 {
-			break
-		}
-		superSphere := st.spheres.Get(superSphereIndex)
-		if superSphere.Sphere.ContainsSphere(integrateCandidate.Sphere) {
-			containsUs = superSphereIndex
-			break
-		}
-
-		// TODO: Verify this
-		dist := superSphere.Sphere.Center.Distance(integrateCandidate.Sphere.Center) + integrateCandidate.Sphere.Radius - superSphere.Sphere.Radius
-		if dist < nearestDist {
-			nearest = superSphereIndex
-			nearestDist = dist
-		}
-
-		superSphereIndex = superSphere.next
-	}
-
-	// if a super Sphere contains it, just insert it!
-	if containsUs != -1 {
-		st.addChild(containsUs, entryID)
-		return
-	}
-
-	// check to see if the nearest Sphere can grow to contain us
-	if nearest != -1 {
-		parent := st.spheres.Get(nearest)
-		newSize := nearestDist + parent.Sphere.Radius
-		if newSize <= st.maxSize {
-			parent.Sphere.Radius = newSize + st.gravy
-			st.spheres.Set(nearest, parent)
-			st.addChild(nearest, entryID)
-			return
-		}
-	}
-
-	// we'll have to make a new super Sphere
-	parent := SphereEntry{
-		Sphere:     integrateCandidate.Sphere,
-		firstChild: -1,
-		parent:     0,
-	}
-	parent.Sphere.Radius += st.gravy
-	rootSphere = st.spheres.Get(0) // root
-	parent.next = rootSphere.firstChild
-	parentID := st.spheres.Insert(parent)
-	rootSphere.firstChild = parentID
-	st.spheres.Set(0, rootSphere)
-
-	st.addChild(parentID, entryID)
-}
-
 func (st *SphereTree) Recompute() {
 	for {
 		recomputeCandidateID, ok := st.recomputeFIFO.Pop()
@@ -157,11 +100,224 @@ func (st *SphereTree) Recompute() {
 	}
 }
 
+func (st *SphereTree) Walk(f func(s maths.Sphere, level int)) {
+	root := st.spheres.Get(0)
+
+	branchID := root.firstChild
+	for {
+		if branchID == -1 {
+			break
+		}
+		branch := st.spheres.Get(branchID)
+		leafID := branch.firstChild
+		for {
+			if leafID == -1 {
+				break
+			}
+			leaf := st.spheres.Get(leafID)
+			f(leaf.Sphere, 1)
+
+			leafID = leaf.next
+		}
+		f(branch.Sphere, 0)
+		branchID = branch.next
+	}
+}
+func (st *SphereTree) Scan(entries *[]SphereEntry, selectionSphere maths.Sphere) {
+	root := st.spheres.Get(0)
+	branchID := root.firstChild
+
+	for {
+		if branchID == -1 {
+			break
+		}
+		branch := st.spheres.Get(branchID)
+		if selectionSphere.IntersectsSphere(branch.Sphere) {
+			leafID := branch.firstChild
+			for {
+				if leafID == -1 {
+					break
+				}
+
+				leaf := st.spheres.Get(leafID)
+				if selectionSphere.IntersectsSphere(leaf.Sphere) {
+					entryID := leaf.firstChild
+					for {
+						if entryID == -1 {
+							break
+						}
+						entry := st.spheres.Get(entryID)
+						if selectionSphere.IntersectsSphere(entry.Sphere) {
+							*entries = append(*entries, entry)
+							*entries = append(*entries, branch) // TODO: temp
+							*entries = append(*entries, leaf)   // TODO: temp
+						}
+						entryID = entry.next
+					}
+				}
+
+				leafID = leaf.next
+			}
+		}
+
+		branchID = branch.next
+	}
+}
+
+func (st *SphereTree) queueIntegrate(entryID int) {
+	entry := st.spheres.Get(entryID)
+
+	if entry.flags.Has(SPFIntegrate) {
+		return
+	}
+
+	entry.flags.Set(SPFIntegrate)
+	st.spheres.Set(entryID, entry)
+	st.integrateFIFO.Push(entryID)
+}
+
+func (st *SphereTree) queueRecompute(entryID int) {
+	entry := st.spheres.Get(entryID)
+
+	if entry.flags.Has(SPFRootNode) {
+		return
+	}
+	if entry.flags.Has(SPFRecompute) {
+		return
+	}
+
+	entry.flags.Set(SPFRecompute)
+	st.spheres.Set(entryID, entry)
+	st.recomputeFIFO.Push(entryID)
+}
+
+func (st *SphereTree) integrate(entryID int) {
+	entry := st.spheres.Get(entryID)
+	entry.flags.Clear(SPFIntegrate)
+	st.spheres.Set(entryID, entry)
+
+	// look through all super spheres for candidate parent
+	// look for super spheres that fully contain the candidate or find the closet one
+	root := st.spheres.Get(0) // root
+	sphere := entry.Sphere
+	sphere.Radius += st.gravy
+	branchContainsID, branchNearestID, branchNearestDist := st.findContainsOrNearest(root, sphere)
+
+	// if a branch contains us then look for a leaf to hold us
+	if branchContainsID != -1 {
+		branchContains := st.spheres.Get(branchContainsID)
+		leafContainsID, leafNearestID, leafNearestDist := st.findContainsOrNearest(branchContains, entry.Sphere)
+
+		// if a leaf fully contains us, then just add
+		if leafContainsID >= 0 {
+			st.addChild(leafContainsID, entryID)
+			return
+		}
+
+		// if there's a leaf that can grow to contain us
+		if leafNearestID != -1 {
+			leafNearest := st.spheres.Get(leafNearestID)
+			newSize := leafNearestDist + leafNearest.Sphere.Radius
+			if newSize <= st.maxLeafSize {
+				leafNearest.Sphere.Radius = newSize + st.gravy
+				st.spheres.Set(leafNearestID, leafNearest)
+				st.addChild(leafNearestID, entryID)
+				return
+			}
+		}
+
+		// make a new leaf
+		newSphere := entry.Sphere
+		newSphere.Radius += st.gravy
+		newLeafID := st.spheres.Insert(SphereEntry{Sphere: newSphere, firstChild: -1, next: -1})
+		st.addChild(branchContainsID, newLeafID)
+		st.addChild(newLeafID, entryID)
+		return
+	}
+
+	// check to see if the branchNearestID Sphere can grow to contain us
+	if branchNearestID != -1 {
+		branchNearest := st.spheres.Get(branchNearestID)
+		newSize := branchNearestDist + branchNearest.Sphere.Radius
+		if newSize <= st.maxBranchSize {
+			branchNearest.Sphere.Radius = newSize + st.gravy
+			st.spheres.Set(branchNearestID, branchNearest)
+
+			leafContainsID, leafNearestID, leafNearestDist := st.findContainsOrNearest(branchNearest, entry.Sphere)
+
+			if leafContainsID != -1 {
+				// this shouldn't be possible
+				//st.addChild(leafContainsID, entryID)
+				//return
+			}
+
+			if leafNearestID != -1 {
+				leafNearest := st.spheres.Get(leafNearestID)
+				newSize := leafNearestDist + leafNearest.Sphere.Radius
+				if newSize <= st.maxLeafSize {
+					leafNearest.Sphere.Radius = newSize + st.gravy
+					st.spheres.Set(leafNearestID, leafNearest)
+					st.addChild(leafNearestID, entryID)
+					st.queueRecompute(branchNearestID)
+					return
+				}
+			}
+
+			// make a new leaf
+			newSphere := entry.Sphere
+			newSphere.Radius += st.gravy
+			leafID := st.spheres.Insert(SphereEntry{Sphere: newSphere, firstChild: -1, next: -1})
+			st.addChild(branchNearestID, leafID)
+			st.addChild(leafID, entryID)
+			st.queueRecompute(branchNearestID)
+			return
+		}
+	}
+
+	// we'll have to make a new branch
+	newSphere := entry.Sphere
+	newSphere.Radius += st.gravy
+	branchID := st.spheres.Insert(SphereEntry{Sphere: newSphere, firstChild: -1, next: -1})
+	leafID := st.spheres.Insert(SphereEntry{Sphere: newSphere, firstChild: -1, next: -1})
+
+	st.addChild(leafID, entryID)
+	st.addChild(branchID, leafID)
+	st.addChild(0, branchID)
+}
+
+func (st *SphereTree) findContainsOrNearest(rootSphere SphereEntry, sphere maths.Sphere) (int, int, float64) {
+	containsID := -1
+	nearestID := -1
+	nearestDist := math.MaxFloat64
+	superSphereIndex := rootSphere.firstChild
+	for {
+		if superSphereIndex < 0 {
+			break
+		}
+		superSphere := st.spheres.Get(superSphereIndex)
+		if superSphere.Sphere.ContainsSphere(sphere) {
+			// TODO: choose nearestID that can contain us
+			containsID = superSphereIndex
+			break
+		}
+
+		// TODO: Verify this
+		dist := superSphere.Sphere.Center.Distance(sphere.Center) + sphere.Radius - superSphere.Sphere.Radius // RINSE
+		if dist < nearestDist {
+			nearestID = superSphereIndex
+			nearestDist = dist
+		}
+
+		superSphereIndex = superSphere.next
+	}
+	return containsID, nearestID, nearestDist
+}
+
 func (st *SphereTree) recompute(superSphereID int) {
 	superSphere := st.spheres.Get(superSphereID)
 
 	if superSphere.firstChild == -1 {
-		st.removeChild(0, superSphereID)
+		st.removeChild(superSphere.parent, superSphereID)
 		st.spheres.Erase(superSphereID)
 		return
 	}
@@ -195,100 +351,16 @@ func (st *SphereTree) recompute(superSphereID int) {
 			newRadius = radius
 			if newRadius+st.gravy > superSphere.Sphere.Radius {
 				superSphere.Sphere.Center = oldCenter
+				superSphere.flags.Clear(SPFRecompute)
+				st.spheres.Set(superSphereID, superSphere)
 				return
 			}
 		}
 		childIndex = child.next
 	}
 	superSphere.Sphere.Radius = newRadius + st.gravy
+	superSphere.flags.Clear(SPFRecompute)
 	st.spheres.Set(superSphereID, superSphere)
-}
-
-func (st *SphereTree) Walk(f func(s maths.Sphere, isSuper bool)) {
-	root := st.spheres.Get(0)
-
-	childIndex := root.firstChild
-	for {
-		if childIndex == -1 {
-			break
-		}
-		child := st.spheres.Get(childIndex)
-		entryIndex := child.firstChild
-		for {
-			if entryIndex == -1 {
-				break
-			}
-			entry := st.spheres.Get(entryIndex)
-			f(entry.Sphere, false)
-			entryIndex = entry.next
-		}
-		childIndex = child.next
-	}
-
-	childIndex = root.firstChild
-	for {
-		if childIndex == -1 {
-			break
-		}
-		child := st.spheres.Get(childIndex)
-		f(child.Sphere, true)
-		childIndex = child.next
-	}
-}
-
-func (st *SphereTree) QueueIntegrate(entryID int) {
-	for i := 0; i < st.integrateFIFO.Len(); i++ {
-		if st.integrateFIFO.Peek(i) == entryID {
-			return
-		}
-	}
-	st.integrateFIFO.Push(entryID)
-}
-
-func (st *SphereTree) QueueRecompute(parentID int) {
-	if parentID == 0 {
-		return
-	}
-	for i := 0; i < st.recomputeFIFO.Len(); i++ {
-		if st.recomputeFIFO.Peek(i) == parentID {
-			return
-		}
-	}
-	st.recomputeFIFO.Push(parentID)
-}
-
-func (st *SphereTree) Scan(selectionSphere maths.Sphere) []SphereEntry {
-	var results []SphereEntry
-
-	root := st.spheres.Get(0)
-	sphereIndex := root.firstChild
-
-	for {
-		if sphereIndex == -1 {
-			break
-		}
-		sphere := st.spheres.Get(sphereIndex)
-		if selectionSphere.IntersectsSphere(sphere.Sphere) {
-			childIndex := sphere.firstChild
-			for {
-				if childIndex == -1 {
-					break
-				}
-
-				child := st.spheres.Get(childIndex)
-
-				if selectionSphere.IntersectsSphere(child.Sphere) {
-					results = append(results, child)
-				}
-
-				childIndex = child.next
-			}
-		}
-
-		sphereIndex = sphere.next
-	}
-
-	return results
 }
 
 func (st *SphereTree) addChild(parentID, sphereID int) {
@@ -302,7 +374,7 @@ func (st *SphereTree) addChild(parentID, sphereID int) {
 	st.spheres.Set(parentID, parent)
 	st.spheres.Set(sphereID, entry)
 
-	st.QueueRecompute(parentID)
+	st.queueRecompute(parentID)
 }
 
 func (st *SphereTree) removeChild(parentID, entryID int) {
@@ -330,5 +402,5 @@ func (st *SphereTree) removeChild(parentID, entryID int) {
 	st.spheres.Set(parentID, parent)
 	st.spheres.Set(entryID, entry)
 
-	st.QueueRecompute(parentID)
+	st.queueRecompute(parentID)
 }

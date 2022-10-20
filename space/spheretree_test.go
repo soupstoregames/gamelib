@@ -12,25 +12,17 @@ func BenchmarkNewSphereTree_MoveAndProcess(b *testing.B) {
 		actors        int
 		maxSphereSize float64
 	}{
-		"?actors=2000&maxSphereSize=100": {
-			actors:        2000,
-			maxSphereSize: 100,
-		},
-		"?actors=2000&maxSphereSize=250": {
-			actors:        2000,
-			maxSphereSize: 250,
-		},
-		"?actors=2000&maxSphereSize=500": {
-			actors:        2000,
-			maxSphereSize: 500,
-		},
-		"?actors=2000&maxSphereSize=750": {
-			actors:        2000,
-			maxSphereSize: 750,
-		},
-		"?actors=2000&maxSphereSize=1000": {
-			actors:        2000,
-			maxSphereSize: 1000,
+		//"?actors=10": {
+		//	actors: 10,
+		//},
+		//"?actors=100": {
+		//	actors: 100,
+		//},
+		//"?actors=1000": {
+		//	actors: 1000,
+		//},
+		"?actors=10000": {
+			actors: 10000,
 		},
 	}
 
@@ -42,7 +34,7 @@ func BenchmarkNewSphereTree_MoveAndProcess(b *testing.B) {
 	center := maths.Vector3{X: 4000, Y: 4000}
 	for name, c := range cases {
 		b.Run(name, func(b *testing.B) {
-			st := space.NewSphereTree(maths.Sphere{Center: center, Radius: 6000}, c.maxSphereSize, c.maxSphereSize/10)
+			st := space.NewSphereTree(center, 1000, 200, 20)
 
 			var actors []actor
 			for i := 0; i < c.actors; i++ {
@@ -53,10 +45,8 @@ func BenchmarkNewSphereTree_MoveAndProcess(b *testing.B) {
 				actors = append(actors, actor)
 			}
 
-			// static actors
-			for i := 0; i < c.actors; i++ {
-				st.Insert(uint64(i+c.actors), maths.Sphere{Center: maths.Vector3{X: rand.Float64() * 8000, Y: rand.Float64() * 8000}, Radius: 1})
-			}
+			st.Integrate()
+			st.Recompute()
 
 			b.ReportAllocs()
 			b.ResetTimer()
@@ -100,7 +90,7 @@ func BenchmarkNewSphereTree_Scan(b *testing.B) {
 	center := maths.Vector3{X: 4000, Y: 4000}
 	for name, c := range cases {
 		b.Run(name, func(b *testing.B) {
-			st := space.NewSphereTree(maths.Sphere{Center: center, Radius: 6000}, 1000, 100)
+			st := space.NewSphereTree(center, 2000, 500, 50)
 
 			var actors []actor
 			for i := 0; i < c.actors; i++ {
@@ -112,17 +102,23 @@ func BenchmarkNewSphereTree_Scan(b *testing.B) {
 			}
 
 			// static actors
-			for i := 0; i < c.actors; i++ {
-				st.Insert(uint64(i+c.actors), maths.Sphere{Center: maths.Vector3{X: rand.Float64() * 8000, Y: rand.Float64() * 8000}, Radius: 1})
-			}
+			//for i := 0; i < c.actors; i++ {
+			//	st.Insert(uint64(i+c.actors), maths.Sphere{Center: maths.Vector3{X: rand.Float64() * 8000, Y: rand.Float64() * 8000}, Radius: 1})
+			//}
+
+			st.Integrate()
+			st.Recompute()
 
 			b.ReportAllocs()
 			b.ResetTimer()
 
+			var entries []space.SphereEntry
 			for n := 0; n < b.N; n++ {
-				st.Scan(maths.Sphere{Center: center, Radius: 100})
+				for i := 0; i < c.actors; i++ {
+					st.Scan(&entries, maths.Sphere{Center: actors[i].sphere.Center, Radius: 100})
+					entries = entries[:0]
+				}
 			}
 		})
 	}
-
 }
