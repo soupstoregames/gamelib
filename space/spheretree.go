@@ -27,9 +27,9 @@ type SphereEntry struct {
 	ID     uint64
 	Sphere maths.Sphere
 
-	parent     int
-	firstChild int
-	next       int
+	parent     int32
+	firstChild int32
+	next       int32
 	flags      data.Bitfield1[uint8]
 }
 
@@ -57,7 +57,7 @@ func (st *SphereTree) Insert(id uint64, sphere maths.Sphere) int {
 
 func (st *SphereTree) Remove(entryID int) {
 	entry := st.spheres.Get(entryID)
-	st.removeChild(entry.parent, entryID)
+	st.removeChild(int(entry.parent), entryID)
 	st.spheres.Erase(entryID)
 }
 
@@ -67,7 +67,7 @@ func (st *SphereTree) Move(entryID int, sphere maths.Sphere) {
 	st.spheres.Set(entryID, entry)
 
 	parentID := entry.parent
-	parent := st.spheres.Get(parentID)
+	parent := st.spheres.Get(int(parentID))
 	if parent.Sphere.ContainsSphere(entry.Sphere) {
 		return
 	}
@@ -75,9 +75,9 @@ func (st *SphereTree) Move(entryID int, sphere maths.Sphere) {
 	// entry has broken out of Sphere
 	// so detach it and queue it for integration
 	// and recompute its old parent
-	st.removeChild(parentID, entryID)
+	st.removeChild(int(parentID), entryID)
 	st.queueIntegrate(entryID)
-	st.queueRecompute(parentID)
+	st.queueRecompute(int(parentID))
 }
 
 func (st *SphereTree) Integrate() {
@@ -108,13 +108,13 @@ func (st *SphereTree) Walk(f func(s maths.Sphere, level int)) {
 		if branchID == -1 {
 			break
 		}
-		branch := st.spheres.Get(branchID)
+		branch := st.spheres.Get(int(branchID))
 		leafID := branch.firstChild
 		for {
 			if leafID == -1 {
 				break
 			}
-			leaf := st.spheres.Get(leafID)
+			leaf := st.spheres.Get(int(leafID))
 			f(leaf.Sphere, 1)
 
 			leafID = leaf.next
@@ -131,7 +131,7 @@ func (st *SphereTree) Scan(entries *[]SphereEntry, selectionSphere maths.Sphere)
 		if branchID == -1 {
 			break
 		}
-		branch := st.spheres.Get(branchID)
+		branch := st.spheres.Get(int(branchID))
 		if selectionSphere.IntersectsSphere(branch.Sphere) {
 			leafID := branch.firstChild
 			for {
@@ -139,14 +139,14 @@ func (st *SphereTree) Scan(entries *[]SphereEntry, selectionSphere maths.Sphere)
 					break
 				}
 
-				leaf := st.spheres.Get(leafID)
+				leaf := st.spheres.Get(int(leafID))
 				if selectionSphere.IntersectsSphere(leaf.Sphere) {
 					entryID := leaf.firstChild
 					for {
 						if entryID == -1 {
 							break
 						}
-						entry := st.spheres.Get(entryID)
+						entry := st.spheres.Get(int(entryID))
 						if selectionSphere.IntersectsSphere(entry.Sphere) {
 							*entries = append(*entries, entry)
 						}
@@ -292,17 +292,17 @@ func (st *SphereTree) findContainsOrNearest(rootSphere SphereEntry, sphere maths
 		if superSphereIndex < 0 {
 			break
 		}
-		superSphere := st.spheres.Get(superSphereIndex)
+		superSphere := st.spheres.Get(int(superSphereIndex))
 		if superSphere.Sphere.ContainsSphere(sphere) {
 			// TODO: choose nearestID that can contain us
-			containsID = superSphereIndex
+			containsID = int(superSphereIndex)
 			break
 		}
 
 		// TODO: Verify this
 		dist := superSphere.Sphere.Center.Distance(sphere.Center) + sphere.Radius - superSphere.Sphere.Radius // RINSE
 		if dist < nearestDist {
-			nearestID = superSphereIndex
+			nearestID = int(superSphereIndex)
 			nearestDist = dist
 		}
 
@@ -315,7 +315,7 @@ func (st *SphereTree) recompute(superSphereID int) {
 	superSphere := st.spheres.Get(superSphereID)
 
 	if superSphere.firstChild == -1 {
-		st.removeChild(superSphere.parent, superSphereID)
+		st.removeChild(int(superSphere.parent), superSphereID)
 		st.spheres.Erase(superSphereID)
 		return
 	}
@@ -329,7 +329,7 @@ func (st *SphereTree) recompute(superSphereID int) {
 		}
 
 		childCount++
-		child := st.spheres.Get(childIndex)
+		child := st.spheres.Get(int(childIndex))
 		total = total.Add(child.Sphere.Center)
 		childIndex = child.next
 	}
@@ -343,7 +343,7 @@ func (st *SphereTree) recompute(superSphereID int) {
 		if childIndex == -1 {
 			break
 		}
-		child := st.spheres.Get(childIndex)
+		child := st.spheres.Get(int(childIndex))
 		radius := superSphere.Sphere.Center.Distance(child.Sphere.Center) + child.Sphere.Radius
 		if radius > newRadius {
 			newRadius = radius
@@ -365,9 +365,9 @@ func (st *SphereTree) addChild(parentID, sphereID int) {
 	parent := st.spheres.Get(parentID)
 	entry := st.spheres.Get(sphereID)
 
-	entry.parent = parentID
+	entry.parent = int32(parentID)
 	entry.next = parent.firstChild
-	parent.firstChild = sphereID
+	parent.firstChild = int32(sphereID)
 
 	st.spheres.Set(parentID, parent)
 	st.spheres.Set(sphereID, entry)
@@ -379,7 +379,7 @@ func (st *SphereTree) removeChild(parentID, entryID int) {
 	parent := st.spheres.Get(parentID)
 	entry := st.spheres.Get(entryID)
 
-	childIndex := parent.firstChild
+	childIndex := int(parent.firstChild)
 	if childIndex == entryID {
 		parent.firstChild = entry.next
 	} else {
@@ -388,12 +388,12 @@ func (st *SphereTree) removeChild(parentID, entryID int) {
 				break
 			}
 			child := st.spheres.Get(childIndex)
-			if child.next == entryID {
+			if int(child.next) == entryID {
 				child.next = entry.next
 				st.spheres.Set(childIndex, child)
 				break
 			}
-			childIndex = child.next
+			childIndex = int(child.next)
 		}
 	}
 

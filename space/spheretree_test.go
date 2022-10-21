@@ -121,7 +121,7 @@ func BenchmarkNewSphereTree_Scan(b *testing.B) {
 			var entries []space.SphereEntry
 			for n := 0; n < b.N; n++ {
 				for i := 0; i < c.actors; i++ {
-					st.Scan(&entries, maths.Sphere{Center: actors[i].sphere.Center, Radius: 100})
+					st.Scan(&entries, maths.Sphere{Center: center, Radius: 100})
 					entries = entries[:0]
 				}
 			}
