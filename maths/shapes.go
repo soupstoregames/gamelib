@@ -16,7 +16,7 @@ func (r Rectangle) ContainsRect(r2 Rectangle) bool {
 }
 
 func (r Rectangle) Intersects(r2 Rectangle) bool {
-	return r.X < r2.X+r2.Width && r.X+r.Width > r2.X && r.Y < r2.Y+r2.Height && r.Y+r.Height > r2.Y
+	return !(r2.X > r.X+r.Width || r2.X+r2.Width < r.X || r2.Y > r.Y+r.Height || r2.Y+r2.Height < r.Y)
 }
 
 func (r Rectangle) Merge(r2 Rectangle) (Rectangle, bool) {
@@ -66,6 +66,15 @@ func (r Rectangle) Merge(r2 Rectangle) (Rectangle, bool) {
 	}
 
 	return r, false
+}
+
+func (r Rectangle) Expand(exp float64) Rectangle {
+	return Rectangle{
+		X:      r.X + exp,
+		Y:      r.Y + exp,
+		Width:  r.Width + exp,
+		Height: r.Height + exp,
+	}
 }
 
 type Sphere struct {
