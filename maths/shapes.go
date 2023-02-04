@@ -77,6 +77,27 @@ func (r Rectangle) Expand(exp float64) Rectangle {
 	}
 }
 
+
+type Circle struct {
+	Center Vector2
+	Radius float64
+}
+
+func NewCircle(center Vector2, radius float64) Circle {
+	return Circle{
+		Center: center,
+		Radius: radius,
+	}
+}
+
+func (s Circle) IntersectsCircle(s2 Circle) bool {
+	return s.Center.Distance(s2.Center) < s.Radius+s2.Radius
+}
+
+func (s Circle) ContainsCircle(s2 Circle) bool {
+	return s.Radius >= s.Center.Distance(s2.Center)+s2.Radius
+}
+
 type Sphere struct {
 	Center Vector3
 	Radius float64
