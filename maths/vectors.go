@@ -45,6 +45,39 @@ func (v Vector2) Distance2(v2 Vector2) float64 {
 	return v.X*v.X + v.Y*v.Y
 }
 
+func (v Vector2) ToVector2Int() Vector2i {
+	return Vector2i{int64(v.X), int64(v.Y)}
+}
+
+type Vector2i struct {
+	X int64
+	Y int64
+}
+
+func (v Vector2i) Add(v2 Vector2i) Vector2i {
+	v.X += v2.X
+	v.Y += v2.Y
+	return v
+}
+
+func (v Vector2i) Sub(v2 Vector2i) Vector2i {
+	v.X -= v2.X
+	v.Y -= v2.Y
+	return v
+}
+
+func (v Vector2i) Multiply(scalar int64) Vector2i {
+	v.X *= scalar
+	v.Y *= scalar
+	return v
+}
+
+func (v Vector2i) Divide(scalar int64) Vector2i {
+	v.X /= scalar
+	v.Y /= scalar
+	return v
+}
+
 type Vector3 struct {
 	X float64
 	Y float64
