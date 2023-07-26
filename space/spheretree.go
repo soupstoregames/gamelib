@@ -17,12 +17,6 @@ type SphereTree struct {
 	gravy         float64
 }
 
-const (
-	SPFRootNode = iota
-	SPFIntegrate
-	SPFRecompute
-)
-
 type SphereEntry struct {
 	ID     uint64
 	Sphere maths.Sphere
