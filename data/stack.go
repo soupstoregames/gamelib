@@ -11,21 +11,21 @@ func (s *Stack[T]) Push(e T) {
 	s.data = append(s.data, e)
 }
 
-func (s *Stack[T]) Pop() (T, bool) {
+func (s *Stack[T]) Pop() T {
 	if len(s.data) == 0 {
-		return utils.Zero[T](), false
+		return utils.Zero[T]()
 	}
 	end := len(s.data) - 1
 	e := s.data[end]
 	s.data = s.data[:end]
-	return e, true
+	return e
 }
 
-func (s *Stack[T]) Peek() (T, bool) {
+func (s *Stack[T]) Peek() T {
 	if len(s.data) == 0 {
-		return utils.Zero[T](), false
+		return utils.Zero[T]()
 	}
-	return s.data[len(s.data)-1], true
+	return s.data[len(s.data)-1]
 }
 
 func (s *Stack[T]) Len() int {
